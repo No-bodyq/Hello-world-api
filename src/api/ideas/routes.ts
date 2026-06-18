@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { ideaSchema } from "@/lib/validators";
-import { sanitizeHTML } from "@/lib/sanitizer";
-import { prisma } from "@/lib/db";
+import { NextRequest, NextResponse } from 'next/server';
+import { ideaSchema } from '@/lib/validators';
+import { sanitizeHTML } from '@/lib/sanitizer';
+import { prisma } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 /**
  * POST /api/ideas
@@ -11,6 +12,15 @@ import { prisma } from "@/lib/db";
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
     // 1) Validate shape/types
     const parsed = ideaSchema.parse(body);
@@ -24,22 +34,22 @@ export async function POST(request: NextRequest) {
         title: parsed.title,
         content: cleanContent,
         tags: parsed.tags ?? [],
-        authorId: /* get from session/auth context */,
+        authorId: user.id,
       },
     });
 
     return NextResponse.json({ idea: created }, { status: 201 });
   } catch (err: any) {
-    if (err.name === "ZodError") {
+    if (err.name === 'ZodError') {
       return NextResponse.json(
-        { error: "Validation failed", details: err.errors },
-        { status: 422 }
+        { error: 'Validation failed', details: err.errors },
+        { status: 422 },
       );
     }
-    console.error("Unexpected error in POST /api/ideas:", err);
+    console.error('Unexpected error in POST /api/ideas:', err);
     return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
+      { error: 'Internal Server Error' },
+      { status: 500 },
     );
   }
 }
@@ -51,14 +61,14 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const allIdeas = await prisma.idea.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json({ ideas: allIdeas }, { status: 200 });
   } catch (err) {
-    console.error("GET /api/ideas failed:", err);
+    console.error('GET /api/ideas failed:', err);
     return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
+      { error: 'Internal Server Error' },
+      { status: 500 },
     );
   }
 }
